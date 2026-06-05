@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f6ead8">
+  <meta name="description" content="Cartas interactivas para el cumpleaños de Agustina.">
+  <title>Cartas para Agustina</title>
+
+  <link rel="icon" href="./assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@12.2.0/swiper-bundle.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/fill/style.css">
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+  <canvas id="particlesCanvas" aria-hidden="true"></canvas>
+
+  <main class="app-shell">
+    <!-- ========================================
+         INTRO: el texto vive en HTML, no en el fondo.
+         Así no se duplica y se adapta al celular.
+    ========================================= -->
+    <section id="introScreen" class="screen intro-screen is-active" aria-labelledby="introTitle">
+      <div class="intro-screen__veil"></div>
+      <div class="floating-paper-layer" id="floatingPaperLayer" aria-hidden="true"></div>
+
+      <div class="intro-panel">
+        <h1 id="introTitle">
+          Te deseamos
+          <span>un feliz cumpleaños</span>
+        </h1>
+
+        <p class="intro-date">11 de junio de 2026</p>
+
+        <button id="startButton" class="start-button" type="button">
+          <i class="ph ph-sparkle" aria-hidden="true"></i>
+          <span>Toca para comenzar</span>
+          <i class="ph ph-arrow-right" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <p class="intro-signature">Hecho con mucho amor para Agustina</p>
+    </section>
+
+    <!-- ========================================
+         COLECCIÓN DE SOBRES
+    ========================================= -->
+    <section id="collectionScreen" class="screen collection-screen" aria-labelledby="collectionTitle">
+      <header class="topbar">
+        <button class="icon-button" id="homeButton" type="button" aria-label="Volver al inicio">
+          <i class="ph ph-house" aria-hidden="true"></i>
+        </button>
+
+        <div class="topbar__title">
+          <p>Cartas para Agustina</p>
+          <span id="progressText">0 de 10 leídas</span>
+        </div>
+
+        <button class="icon-button" id="soundButton" type="button" aria-label="Desactivar sonidos">
+          <i class="ph ph-speaker-high" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div class="collection-copy">
+        <p class="eyebrow">Elegí un sobre</p>
+        <h2 id="collectionTitle">Cada carta guarda algo especial</h2>
+        <p>Deslizá para explorar. El nombre aparece cuando el sobre queda en el centro.</p>
+      </div>
+
+      <div class="progress-track" aria-label="Progreso de cartas abiertas">
+        <span id="progressBar"></span>
+      </div>
+
+      <div class="swiper envelope-swiper" aria-label="Sobres disponibles">
+        <div class="swiper-wrapper" id="envelopeWrapper"></div>
+      </div>
+
+      <div class="active-envelope-meta" aria-live="polite">
+        <p id="activeEnvelopeHint">Deslizá para elegir una carta</p>
+        <h3 id="activeEnvelopeName"></h3>
+
+        <button id="openActiveButton" class="primary-button" type="button">
+          <i class="ph ph-envelope-open" aria-hidden="true"></i>
+          Abrir este sobre
+        </button>
+      </div>
+
+      <button id="randomButton" class="ghost-button" type="button">
+        <i class="ph ph-shuffle" aria-hidden="true"></i>
+        Elegir una al azar
+      </button>
+    </section>
+  </main>
+
+  <!-- ========================================
+       ANIMACIÓN DE APERTURA
+  ========================================= -->
+  <section id="openingOverlay" class="opening-overlay" aria-hidden="true">
+    <div class="opening-light" aria-hidden="true"></div>
+
+    <div class="opening-envelope" aria-hidden="true">
+      <div class="opening-envelope__back"></div>
+      <div class="opening-envelope__paper">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="opening-envelope__left"></div>
+      <div class="opening-envelope__right"></div>
+      <div class="opening-envelope__bottom"></div>
+      <div class="opening-envelope__flap"></div>
+      <div class="opening-envelope__seal">
+        <span id="openingSealIcon" class="opening-seal-mark"></span>
+      </div>
+    </div>
+
+    <p>Preparando la carta...</p>
+  </section>
+
+  <!-- ========================================
+       LECTOR DE CARTA ESCANEADA
+  ========================================= -->
+  <section id="letterModal" class="letter-modal" role="dialog" aria-modal="true" aria-labelledby="letterTitle" hidden>
+    <div class="letter-modal__backdrop" data-close-modal></div>
+
+    <article class="letter-reader">
+      <header class="letter-reader__header">
+        <div>
+          <p class="eyebrow">Carta abierta</p>
+          <h2 id="letterTitle">Carta</h2>
+        </div>
+
+        <button class="icon-button icon-button--dark" type="button" data-close-modal aria-label="Cerrar carta">
+          <i class="ph ph-x" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div class="reader-toolbar" aria-label="Herramientas de lectura">
+        <button class="toolbar-button" id="zoomOutButton" type="button" aria-label="Alejar carta">
+          <i class="ph ph-magnifying-glass-minus" aria-hidden="true"></i>
+        </button>
+
+        <button class="toolbar-button toolbar-button--text" id="resetZoomButton" type="button">100%</button>
+
+        <button class="toolbar-button" id="zoomInButton" type="button" aria-label="Acercar carta">
+          <i class="ph ph-magnifying-glass-plus" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div class="letter-stage" id="letterStage" tabindex="0" aria-label="Imagen de la carta; se puede desplazar cuando está ampliada">
+        <div class="letter-canvas" id="letterCanvas">
+          <img id="letterImage" src="" alt="" draggable="false">
+        </div>
+      </div>
+
+      <footer class="letter-reader__footer">
+        <button id="previousLetterButton" class="secondary-button" type="button">
+          <i class="ph ph-arrow-left" aria-hidden="true"></i>
+          Anterior
+        </button>
+
+        <button id="closeLetterButton" class="secondary-button" type="button" data-close-modal>
+          Cerrar
+        </button>
+
+        <button id="nextLetterButton" class="primary-button" type="button">
+          Siguiente
+          <i class="ph ph-arrow-right" aria-hidden="true"></i>
+        </button>
+      </footer>
+    </article>
+  </section>
+
+  <!-- ========================================
+       FINAL
+  ========================================= -->
+  <section id="finalModal" class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle" hidden>
+    <div class="final-modal__card">
+      <i class="ph-fill ph-heart-straight final-heart" aria-hidden="true"></i>
+      <p class="eyebrow">Con todo nuestro cariño</p>
+      <h2 id="finalTitle">Un pedacito de todo el cariño que te rodea</h2>
+      <p>Terminaste de leer todas las cartas.</p>
+      <p>Cada mensaje fue escrito especialmente para vos. Esperamos que puedas volver a ellos cada vez que quieras recordar cuánto te queremos.</p>
+      <p>Feliz cumpleaños, Agustina.</p>
+
+      <button id="closeFinalButton" class="primary-button" type="button">
+        Volver a leer las cartas
+      </button>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/swiper@12.2.0/swiper-bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+
+  <script src="./js/cartas.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

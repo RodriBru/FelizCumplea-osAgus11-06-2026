@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" role="img" aria-label="Textura decorativa de cartas antiguas sin texto legible">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff7e7"/>
+      <stop offset=".58" stop-color="#efd9b5"/>
+      <stop offset="1" stop-color="#c99f6d"/>
+    </linearGradient>
+
+    <linearGradient id="vellum" x1="0" y1="0" x2=".8" y2="1">
+      <stop stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#e4c494"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#5f4230" flood-opacity=".16"/>
+    </filter>
+
+    <filter id="blurInk">
+      <feGaussianBlur stdDeviation="2.3"/>
+    </filter>
+
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <pattern id="ruled" width="240" height="58" patternUnits="userSpaceOnUse">
+      <path d="M0 55H240" stroke="#8d6a4e" stroke-width="1.2" opacity=".1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1080" height="1920" fill="#efe0cc"/>
+  <rect width="1080" height="1920" filter="url(#grain)" opacity=".46"/>
+  <rect width="1080" height="1920" fill="url(#ruled)" opacity=".34"/>
+
+  <g filter="url(#softShadow)" opacity=".72">
+    <g transform="translate(-118 116) rotate(-11)">
+      <rect width="430" height="310" rx="14" fill="url(#paper)"/>
+      <rect x="22" y="22" width="386" height="266" rx="9" fill="none" stroke="#b48651" stroke-width="2" opacity=".34"/>
+      <g fill="none" stroke="#77523d" stroke-linecap="round" filter="url(#blurInk)" opacity=".35">
+        <path d="M44 76c48-34 94 28 151-2 48-24 76-38 135-12"/>
+        <path d="M52 118c65-28 118 24 188 1 42-14 80-25 124-10"/>
+        <path d="M45 166c66-18 106 17 164 3 64-15 100-31 164-6"/>
+        <path d="M54 218c76-32 123 22 201-1 35-11 76-20 112-7"/>
+      </g>
+    </g>
+
+    <g transform="translate(772 90) rotate(10)">
+      <rect width="380" height="270" rx="14" fill="url(#vellum)"/>
+      <path d="M24 34h332v202H24z" fill="none" stroke="#b48651" stroke-width="2" opacity=".32"/>
+      <g fill="none" stroke="#704c38" stroke-linecap="round" filter="url(#blurInk)" opacity=".32">
+        <path d="M42 70c48-22 79 23 129 0 56-25 102-30 157-7"/>
+        <path d="M39 112c68-25 111 22 171 0 38-14 83-19 119-2"/>
+        <path d="M48 159c59-18 111 13 168-3 46-13 78-16 112-5"/>
+        <path d="M48 203c51-13 91 8 140-4"/>
+      </g>
+      <circle cx="306" cy="214" r="28" fill="#9e4639" opacity=".74"/>
+      <circle cx="306" cy="214" r="17" fill="none" stroke="#e7a694" stroke-width="3" opacity=".54"/>
+    </g>
+
+    <g transform="translate(-150 700) rotate(8)" opacity=".78">
+      <rect width="350" height="250" rx="14" fill="url(#vellum)"/>
+      <g fill="none" stroke="#77523d" stroke-linecap="round" filter="url(#blurInk)" opacity=".26">
+        <path d="M38 62c54-21 92 18 145-1 38-14 75-17 107-6"/>
+        <path d="M36 104c61-20 113 19 169 1 39-13 71-15 97-5"/>
+        <path d="M42 151c76-21 123 21 221-4"/>
+        <path d="M44 198c68-18 108 14 184-4"/>
+      </g>
+    </g>
+
+    <g transform="translate(882 690) rotate(-7)" opacity=".66">
+      <rect width="300" height="220" rx="14" fill="url(#paper)"/>
+      <g fill="none" stroke="#77523d" stroke-linecap="round" filter="url(#blurInk)" opacity=".3">
+        <path d="M35 62c48-20 88 17 135-1 28-10 61-14 95-4"/>
+        <path d="M34 104c52-16 93 13 143-2 33-10 60-9 78-2"/>
+        <path d="M41 150c62-15 96 12 161-3"/>
+      </g>
+    </g>
+
+    <g transform="translate(-84 1324) rotate(10)">
+      <rect width="450" height="330" rx="16" fill="url(#paper)"/>
+      <rect x="24" y="24" width="402" height="282" rx="10" fill="none" stroke="#b48651" stroke-width="2" opacity=".3"/>
+      <g fill="none" stroke="#77523d" stroke-linecap="round" filter="url(#blurInk)" opacity=".33">
+        <path d="M55 82c62-31 111 24 176-3 63-26 115-32 165-8"/>
+        <path d="M54 130c77-27 130 25 205 1 43-14 88-21 135-4"/>
+        <path d="M60 183c79-22 128 23 204-2 51-17 91-19 128-6"/>
+        <path d="M58 236c58-17 98 12 152-3 44-12 77-16 110-6"/>
+      </g>
+    </g>
+
+    <g transform="translate(780 1355) rotate(-12)">
+      <rect width="390" height="292" rx="16" fill="url(#vellum)"/>
+      <path d="M30 38h330v216H30z" fill="none" stroke="#b48651" stroke-width="2" opacity=".32"/>
+      <g fill="none" stroke="#704c38" stroke-linecap="round" filter="url(#blurInk)" opacity=".31">
+        <path d="M48 82c65-23 103 23 167 0 43-15 83-18 124-4"/>
+        <path d="M48 126c56-15 103 8 154-3 51-12 92-22 135-7"/>
+        <path d="M52 175c70-21 119 21 196-2 38-11 68-12 91-4"/>
+        <path d="M48 222c44-13 86 10 128-2"/>
+      </g>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#7d5c45" stroke-linecap="round" filter="url(#blurInk)" opacity=".13">
+    <path d="M135 520c72-40 142 32 222-5 59-28 116-37 182-10 68 27 112 25 166 2 58-25 119-27 171-5"/>
+    <path d="M118 1032c88-34 165 26 247-6 60-23 122-26 184-3 74 27 126 22 190-5 54-22 112-22 168-2"/>
+    <path d="M180 1168c62-24 116 18 176-3 61-21 103-25 160-4 52 19 95 17 137-1"/>
+    <path d="M115 1780c88-34 155 26 237-4 62-23 119-28 184-5 76 27 135 22 198-5 51-22 108-22 165-3"/>
+  </g>
+
+  <g opacity=".34">
+    <circle cx="126" cy="545" r="4" fill="#fff5d8"/>
+    <circle cx="908" cy="475" r="5" fill="#fff1cf"/>
+    <circle cx="222" cy="1138" r="3" fill="#a77a4e"/>
+    <circle cx="854" cy="1176" r="4" fill="#fff2d2"/>
+    <circle cx="501" cy="275" r="3" fill="#8a6246"/>
+    <circle cx="617" cy="1648" r="4" fill="#fff3d7"/>
+  </g>
+</svg>
