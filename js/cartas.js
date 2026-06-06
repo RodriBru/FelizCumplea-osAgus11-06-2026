@@ -1,99 +1,83 @@
 /*
-  ==========================================================
-  CONFIGURACIÓN CENTRAL DE CARTAS — VERSIÓN 2
-  ==========================================================
+  Configuracion central de Cartas para Agustina.
 
-  La experiencia tiene 10 lugares reservados:
-  - Perla ya está configurada con sello de galleta.
-  - Shayna ya está configurada con sello de nota musical.
-  - Anage y las cartas pendientes usan corazón hasta definir un sello propio.
-  - Las otras 7 cartas quedan genéricas hasta tener nombres reales.
-  - La carta física de Rodrigo NO se incluye en esta web.
-
-  Para reemplazar un lugar genérico:
-  1. Copiá la imagen escaneada dentro de /assets/img/cartas/
-  2. Cambiá persona, subtitulo, imagen y tipoSello.
+  Para activar una carta pendiente:
+  1. Copia la imagen escaneada en assets/img/cartas/ con el nombre indicado en archivo.
+  2. Cambia disponible a true.
+  3. Si hace falta, cambia sello por: neutro, cookie, flor, sol o nota-musical.
 */
+
+const VIDEO_SORPRESA = "./video/video-sorpresa.mp4";
 
 const CARTAS = [
   {
-    id: "perla",
-    persona: "Perla",
-    subtitulo: "Un mensaje muy dulce",
-    imagen: "./assets/img/cartas/perla.svg",
-    tipoSello: "cookie",
-    disponible: true
+    id: 1,
+    nombre: "Antonella",
+    archivo: "./assets/img/cartas/carta-antonella.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "shayna",
-    persona: "Shayna",
-    subtitulo: "Un mensaje con música propia",
-    imagen: "./assets/img/cartas/carta_02.svg",
-    tipoSello: "music",
-    disponible: true
+    id: 2,
+    nombre: "Alejandro",
+    archivo: "./assets/img/cartas/carta-alejandro.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "anage",
-    persona: "Anage",
-    subtitulo: "Un mensaje con mucho corazón",
-    imagen: "./assets/img/cartas/anage.jpeg",
-    tipoSello: "heart",
-    disponible: true
+    id: 3,
+    nombre: "Anage",
+    archivo: "./assets/img/cartas/carta-anage.jpg",
+    disponible: true,
+    sello: "sol"
   },
   {
-    id: "carta-04",
-    persona: "Carta sorpresa 04",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_04.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 4,
+    nombre: "Andrea Marín",
+    archivo: "./assets/img/cartas/carta-andrea-marin.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "carta-05",
-    persona: "Carta sorpresa 05",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_05.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 5,
+    nombre: "Michele",
+    archivo: "./assets/img/cartas/carta-michele.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "carta-06",
-    persona: "Carta sorpresa 06",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_06.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 6,
+    nombre: "Nurinel",
+    archivo: "./assets/img/cartas/carta-nurinel.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "carta-07",
-    persona: "Carta sorpresa 07",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_07.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 7,
+    nombre: "Rachell",
+    archivo: "./assets/img/cartas/carta-rachell.jpg",
+    disponible: false,
+    sello: "neutro"
   },
   {
-    id: "carta-08",
-    persona: "Carta sorpresa 08",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_08.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 8,
+    nombre: "Reyina",
+    archivo: "./assets/img/cartas/carta-reyina.jpg",
+    disponible: false,
+    sello: "flor"
   },
   {
-    id: "carta-09",
-    persona: "Carta sorpresa 09",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_09.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 9,
+    nombre: "Shayna",
+    archivo: "./assets/img/cartas/carta-shayna.jpg",
+    disponible: false,
+    sello: "nota-musical"
   },
   {
-    id: "carta-10",
-    persona: "Carta sorpresa 10",
-    subtitulo: "Nombre por definir",
-    imagen: "./assets/img/cartas/carta_10.svg",
-    tipoSello: "heart",
-    disponible: true
+    id: 10,
+    nombre: "Perla",
+    archivo: "./assets/img/cartas/carta-perla.jpg",
+    disponible: false,
+    sello: "cookie"
   }
 ];
