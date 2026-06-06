@@ -7,9 +7,9 @@
   </defs>
   <rect width="1240" height="1754" fill="url(#p)"/>
   <rect x="52" y="52" width="1136" height="1650" rx="18" fill="none" stroke="#cfad72" stroke-width="4"/>
-  <text x="620" y="240" text-anchor="middle" font-family="Georgia, serif" font-size="78" fill="#6b3b35">Carta de Shayna</text>
-  <text x="620" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#7c6b5e">Placeholder temporal para la carta escrita a mano</text>
+  <text x="620" y="240" text-anchor="middle" font-family="Georgia, serif" font-size="78" fill="#6b3b35">Shayna</text>
+  <text x="620" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#7c6b5e">Carta reservada con mucho cariño</text>
   <path d="M145 560 C340 510 520 610 780 555 M145 675 C390 615 590 730 1010 650 M145 790 C340 745 575 830 900 785 M145 905 C380 865 670 965 1050 890 M145 1020 C390 975 610 1085 940 1015"
         fill="none" stroke="#897563" stroke-width="13" stroke-linecap="round" opacity=".25"/>
-  <text x="620" y="1460" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#8a7a6a">Reemplazá este archivo por la carta escaneada real.</text>
+  <text x="620" y="1460" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#8a7a6a">Pronto va a vivir acá una carta escrita con amor.</text>
 </svg>

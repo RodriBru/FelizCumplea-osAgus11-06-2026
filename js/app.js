@@ -1,17 +1,18 @@
 /* ==========================================================
-   CARTAS PARA AGUSTINA - V2
-   - 10 lugares reservados.
+   CARTAS PARA AGUSTINA
+   - Configuracion centralizada en js/cartas.js.
+   - Progreso persistente en localStorage.
    - Sobres SVG con sellos configurables.
-   - Zoom real con desplazamiento dentro de la carta.
-   - Final emotivo solo al completar la lectura.
+   - Visor con zoom real y cierre final con video sorpresa.
 ========================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
-  const STORAGE_KEY = "cartas-agustina-leidas-v2";
-  const readStorage = window.sessionStorage;
-  const MIN_ZOOM = 0.72;
-  const MAX_ZOOM = 2.65;
+  const STORAGE_KEY = "cartas-agustina-estado-v3";
+  const LEGACY_READ_KEY = "cartas-agustina-leidas-v2";
+  const MIN_ZOOM = 0.78;
+  const MAX_ZOOM = 2.9;
   const ZOOM_STEP = 0.17;
+  const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const introScreen = document.querySelector("#introScreen");
   const collectionScreen = document.querySelector("#collectionScreen");
@@ -20,9 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const soundButton = document.querySelector("#soundButton");
   const randomButton = document.querySelector("#randomButton");
   const openActiveButton = document.querySelector("#openActiveButton");
+  const replayVideoButton = document.querySelector("#replayVideoButton");
   const envelopeWrapper = document.querySelector("#envelopeWrapper");
   const activeEnvelopeName = document.querySelector("#activeEnvelopeName");
-  const activeEnvelopeHint = document.querySelector("#activeEnvelopeHint");
   const progressText = document.querySelector("#progressText");
   const progressBar = document.querySelector("#progressBar");
   const floatingPaperLayer = document.querySelector("#floatingPaperLayer");
@@ -43,43 +44,61 @@ document.addEventListener("DOMContentLoaded", () => {
   const finalModal = document.querySelector("#finalModal");
   const closeFinalButton = document.querySelector("#closeFinalButton");
 
-  let swiper;
-  let activeIndex = 0;
-  let zoom = 1;
-  let soundEnabled = true;
-  let audioContext = null;
-  let pendingFinalCelebration = false;
+  const videoModal = document.querySelector("#videoModal");
+  const surpriseVideo = document.querySelector("#surpriseVideo");
+  const videoPendingState = document.querySelector("#videoPendingState");
 
-  clearLegacyReadState();
-  let readIds = loadReadIds();
+  let swiper;
+  let state = loadState();
+  let activeIndex = normalizeIndex(state.activeIndex);
+  let readIds = normalizeReadIds(state.readIds);
+  let zoom = 1;
+  let soundEnabled = state.soundEnabled !== false;
+  let audioContext = null;
+  let audioUnlocked = false;
+  let pendingFinalCelebration = false;
+  let isOpening = false;
+  let lastFocusedElement = null;
+
+  state.readIds = readIds;
+  state.activeIndex = activeIndex;
+  state.soundEnabled = soundEnabled;
+  saveState();
 
   renderFloatingPapers();
   renderSlides();
   initSwiper();
+  syncSoundButton();
   updateActiveMeta(false);
   updateProgress();
+  updateVideoReplayVisibility();
 
   /* ========================================================
      EVENTOS
   ======================================================== */
 
-  startButton.addEventListener("click", enterCollection);
+  startButton.addEventListener("click", () => {
+    unlockAudio();
+    enterCollection();
+  });
   homeButton.addEventListener("click", returnHome);
-  openActiveButton.addEventListener("click", () => openLetter(activeIndex));
-  randomButton.addEventListener("click", openRandomUnreadLetter);
+  openActiveButton.addEventListener("click", () => {
+    unlockAudio();
+    openLetter(activeIndex);
+  });
+  randomButton.addEventListener("click", () => {
+    unlockAudio();
+    openRandomUnreadLetter();
+  });
+  replayVideoButton.addEventListener("click", showVideoSurprise);
+  closeFinalButton.addEventListener("click", () => closeFinalModal({ showVideo: true }));
 
   soundButton.addEventListener("click", () => {
+    unlockAudio();
     soundEnabled = !soundEnabled;
-    const icon = soundButton.querySelector("i");
-
-    icon.className = soundEnabled
-      ? "ph ph-speaker-high"
-      : "ph ph-speaker-slash";
-
-    soundButton.setAttribute(
-      "aria-label",
-      soundEnabled ? "Desactivar sonidos" : "Activar sonidos"
-    );
+    state.soundEnabled = soundEnabled;
+    saveState();
+    syncSoundButton();
 
     if (soundEnabled) playTone(520, 0.08);
   });
@@ -105,13 +124,20 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", closeLetterModal);
   });
 
-  closeFinalButton.addEventListener("click", closeFinalModal);
+  document.querySelectorAll("[data-close-video]").forEach((button) => {
+    button.addEventListener("click", closeVideoModal);
+  });
+
+  surpriseVideo.addEventListener("error", showVideoPendingState);
 
   document.addEventListener("keydown", (event) => {
-    if (finalModal.hidden && letterModal.hidden) return;
+    if (!videoModal.hidden && event.key === "Escape") {
+      closeVideoModal();
+      return;
+    }
 
     if (!finalModal.hidden && event.key === "Escape") {
-      closeFinalModal();
+      closeFinalModal({ showVideo: false });
       return;
     }
 
@@ -131,12 +157,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderSlides() {
     envelopeWrapper.innerHTML = CARTAS.map((carta, index) => {
-      const isRead = readIds.includes(carta.id);
+      const isRead = readIds.includes(letterKey(carta));
       const label = displayLetterName(carta);
 
       return `
         <div class="swiper-slide">
-          <article class="envelope-card ${isRead ? "is-read" : ""}" data-card-id="${escapeHtml(carta.id)}">
+          <article class="envelope-card ${isRead ? "is-read" : ""}" data-card-id="${escapeHtml(letterKey(carta))}">
             <button
               class="envelope-card__button"
               type="button"
@@ -159,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll("[data-open-index]").forEach((button) => {
       button.addEventListener("click", () => {
+        unlockAudio();
         openLetter(Number(button.dataset.openIndex));
       });
     });
@@ -173,53 +200,60 @@ document.addEventListener("DOMContentLoaded", () => {
     const sealGradientId = `sealGradient-${index}`;
     const shadowId = `shadow-${index}`;
     const grainId = `grain-${index}`;
+    const shineId = `shine-${index}`;
 
     return `
       <svg class="envelope-svg" viewBox="0 0 700 476" aria-hidden="true">
         <defs>
           <linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#fff5d8"/>
-            <stop offset=".38" stop-color="#f4d7a5"/>
-            <stop offset=".72" stop-color="#e3bb7d"/>
-            <stop offset="1" stop-color="#cfa069"/>
+            <stop offset="0" stop-color="#fff7df"/>
+            <stop offset=".38" stop-color="#f4d6a4"/>
+            <stop offset=".72" stop-color="#e1b979"/>
+            <stop offset="1" stop-color="#c9955e"/>
           </linearGradient>
 
           <linearGradient id="${flapGradientId}" x1=".24" y1="0" x2=".76" y2="1">
-            <stop offset="0" stop-color="#fff9e3"/>
-            <stop offset=".62" stop-color="#edca91"/>
-            <stop offset="1" stop-color="#d4a264"/>
+            <stop offset="0" stop-color="#fffbe8"/>
+            <stop offset=".6" stop-color="#edca91"/>
+            <stop offset="1" stop-color="#d09b5e"/>
           </linearGradient>
 
           <linearGradient id="${sideLeftGradientId}" x1="0" y1="0" x2="1" y2="1">
-            <stop stop-color="#f6dcaa"/>
-            <stop offset="1" stop-color="#d9ad69"/>
+            <stop stop-color="#f9e2b4"/>
+            <stop offset="1" stop-color="#d6a762"/>
           </linearGradient>
 
           <linearGradient id="${sideRightGradientId}" x1="1" y1="0" x2="0" y2="1">
-            <stop stop-color="#f2d49e"/>
-            <stop offset="1" stop-color="#d4a25f"/>
+            <stop stop-color="#f5d8a6"/>
+            <stop offset="1" stop-color="#cf9a58"/>
           </linearGradient>
 
           <linearGradient id="${bottomGradientId}" x1=".5" y1=".1" x2=".5" y2="1">
-            <stop stop-color="#f8dda9"/>
-            <stop offset="1" stop-color="#dfb06d"/>
+            <stop stop-color="#f9dfa9"/>
+            <stop offset="1" stop-color="#dba966"/>
           </linearGradient>
 
-          <radialGradient id="${sealGradientId}" cx=".34" cy=".25" r=".82">
-            <stop offset="0" stop-color="#dc7663"/>
-            <stop offset=".56" stop-color="#a54136"/>
-            <stop offset="1" stop-color="#68231d"/>
+          <radialGradient id="${sealGradientId}" cx=".33" cy=".24" r=".86">
+            <stop offset="0" stop-color="#e6816d"/>
+            <stop offset=".53" stop-color="#a84237"/>
+            <stop offset="1" stop-color="#64201b"/>
+          </radialGradient>
+
+          <radialGradient id="${shineId}" cx=".28" cy=".18" r=".55">
+            <stop stop-color="#fff1de" stop-opacity=".48"/>
+            <stop offset=".42" stop-color="#f1ab94" stop-opacity=".16"/>
+            <stop offset="1" stop-color="#8b2e27" stop-opacity="0"/>
           </radialGradient>
 
           <filter id="${shadowId}" x="-30%" y="-35%" width="170%" height="180%">
-            <feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#6f4c34" flood-opacity=".22"/>
+            <feDropShadow dx="0" dy="18" stdDeviation="13" flood-color="#60402d" flood-opacity=".24"/>
           </filter>
 
           <filter id="${grainId}">
-            <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="3" stitchTiles="stitch"/>
+            <feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="3" stitchTiles="stitch"/>
             <feColorMatrix type="saturate" values="0"/>
             <feComponentTransfer>
-              <feFuncA type="table" tableValues="0 .13"/>
+              <feFuncA type="table" tableValues="0 .12"/>
             </feComponentTransfer>
           </filter>
         </defs>
@@ -228,37 +262,39 @@ document.addEventListener("DOMContentLoaded", () => {
           <rect x="24" y="27" width="652" height="407" rx="22" fill="url(#${gradientId})" stroke="#bd874d" stroke-width="4"/>
           <rect x="24" y="27" width="652" height="407" rx="22" filter="url(#${grainId})" opacity=".72"/>
 
-          <rect x="39" y="42" width="622" height="377" rx="16" fill="none" stroke="#fff1c8" stroke-width="4" opacity=".88"/>
-          <rect x="50" y="53" width="600" height="355" rx="12" fill="none" stroke="#b77a3b" stroke-width="2" opacity=".52"/>
+          <rect x="39" y="42" width="622" height="377" rx="16" fill="none" stroke="#fff3ce" stroke-width="4" opacity=".86"/>
+          <rect x="50" y="53" width="600" height="355" rx="12" fill="none" stroke="#a86d35" stroke-width="2" opacity=".45"/>
 
           <path d="M25 35 L351 250 L25 432 Z" fill="url(#${sideLeftGradientId})" stroke="#c18d52" stroke-width="2.4"/>
           <path d="M675 35 L349 250 L675 432 Z" fill="url(#${sideRightGradientId})" stroke="#b57b3e" stroke-width="2.4"/>
           <path d="M26 431 L350 222 L674 431 Z" fill="url(#${bottomGradientId})" stroke="#bd874b" stroke-width="2.5"/>
 
           <path d="M25 35 L350 262 L675 35 Z" fill="url(#${flapGradientId})" stroke="#bd874b" stroke-width="3.2"/>
-          <path d="M46 47 L350 239 L654 47" fill="none" stroke="#fff3c8" stroke-width="4" opacity=".42"/>
-          <path d="M50 409 L350 235 L650 409" fill="none" stroke="#9f6d37" stroke-width="2" opacity=".26"/>
+          <path d="M46 47 L350 239 L654 47" fill="none" stroke="#fff4cd" stroke-width="4" opacity=".46"/>
+          <path d="M50 409 L350 235 L650 409" fill="none" stroke="#9f6d37" stroke-width="2" opacity=".25"/>
 
           <path d="M61 76 C92 54 111 56 140 72 M560 72 C591 54 613 56 641 73"
-                fill="none" stroke="#ad7136" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+                fill="none" stroke="#a96d35" stroke-width="5" stroke-linecap="round" opacity=".68"/>
           <path d="M70 391 C104 376 130 379 162 393 M538 393 C573 376 601 379 632 394"
-                fill="none" stroke="#ad7136" stroke-width="5" stroke-linecap="round" opacity=".58"/>
+                fill="none" stroke="#a96d35" stroke-width="5" stroke-linecap="round" opacity=".56"/>
 
           <path d="M83 87 c18 17 28 15 36 0 c8 16 18 16 34 0
                    M548 87 c18 17 28 15 36 0 c8 16 18 16 34 0"
                 fill="none" stroke="#b98142" stroke-width="4" stroke-linecap="round" opacity=".68"/>
 
-          <path d="M33 31 L349 254 L667 31" fill="none" stroke="#8b6037" stroke-width="2" opacity=".16"/>
-          <path d="M32 427 L350 225 L668 427" fill="none" stroke="#fff0be" stroke-width="3" opacity=".28"/>
+          <path d="M33 31 L349 254 L667 31" fill="none" stroke="#80562d" stroke-width="2" opacity=".15"/>
+          <path d="M32 427 L350 225 L668 427" fill="none" stroke="#fff0be" stroke-width="3" opacity=".3"/>
 
-          <g transform="translate(350 246)">
+          <g transform="translate(350 246)" class="seal-group">
+            <circle r="75" fill="#6e221d" opacity=".2" transform="translate(5 7)"/>
             <circle r="73" fill="url(#${sealGradientId})"/>
-            <circle r="73" fill="none" stroke="#5d1f1a" stroke-width="2" opacity=".26"/>
+            <circle r="73" fill="url(#${shineId})"/>
+            <circle r="73" fill="none" stroke="#5d1f1a" stroke-width="2" opacity=".28"/>
             <circle r="58" fill="none" stroke="#f1ad96" stroke-width="4" opacity=".48"/>
-            <circle r="46" fill="none" stroke="#5f201b" stroke-width="5" opacity=".54"/>
-            <circle r="34" fill="none" stroke="#f4b7a2" stroke-width="3" opacity=".36"/>
-            <path d="M-48 -45 C-30 -58 18 -61 47 -42" fill="none" stroke="#f6b59d" stroke-width="5" stroke-linecap="round" opacity=".24"/>
-            ${sealSvg(carta.tipoSello)}
+            <circle r="46" fill="none" stroke="#5f201b" stroke-width="5" opacity=".48"/>
+            <circle r="34" fill="none" stroke="#f4b7a2" stroke-width="3" opacity=".34"/>
+            <path d="M-48 -45 C-30 -58 18 -61 47 -42" fill="none" stroke="#f6b59d" stroke-width="5" stroke-linecap="round" opacity=".25"/>
+            ${sealSvg(carta.sello)}
           </g>
         </g>
       </svg>
@@ -292,30 +328,33 @@ document.addEventListener("DOMContentLoaded", () => {
       effect: "coverflow",
       centeredSlides: true,
       slidesPerView: "auto",
+      initialSlide: activeIndex,
       grabCursor: true,
       loop: false,
-      speed: 640,
-      spaceBetween: 10,
+      speed: 620,
+      spaceBetween: 8,
       threshold: 6,
-      resistanceRatio: 0.72,
+      resistanceRatio: 0.74,
       slideToClickedSlide: true,
       watchSlidesProgress: true,
       coverflowEffect: {
-        rotate: 7,
+        rotate: 6,
         stretch: 0,
-        depth: 116,
+        depth: 122,
         modifier: 1,
-        scale: 0.93,
+        scale: 0.92,
         slideShadows: false
       },
       on: {
         init() {
           activeIndex = this.activeIndex;
+          persistActiveIndex();
           updateActiveMeta(false);
         },
 
         slideChange() {
           activeIndex = this.activeIndex;
+          persistActiveIndex();
           updateActiveMeta(true);
           playTone(370, 0.035);
         }
@@ -328,13 +367,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!carta) return;
 
     activeEnvelopeName.textContent = displayLetterName(carta);
-    activeEnvelopeHint.textContent = carta.subtitulo;
+    openActiveButton.setAttribute("aria-label", `Abrir ${displayLetterName(carta)}`);
 
-    if (animate && window.gsap) {
+    if (animate && window.gsap && !REDUCED_MOTION && document.querySelector(".swiper-slide-active .envelope-card__name")) {
       gsap.fromTo(
-        [activeEnvelopeHint, activeEnvelopeName],
-        { y: 8, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.34, stagger: 0.05, ease: "power2.out" }
+        ".swiper-slide-active .envelope-card__name",
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.34, ease: "power2.out" }
       );
     }
   }
@@ -345,6 +384,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enterCollection() {
     playTone(630, 0.09);
+
+    if (!window.gsap || REDUCED_MOTION) {
+      introScreen.classList.remove("is-active");
+      collectionScreen.classList.add("is-active");
+      return;
+    }
 
     gsap.timeline()
       .to(".intro-panel", {
@@ -380,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
           );
 
           gsap.fromTo(
-            ".active-envelope-meta, .ghost-button",
+            visibleCollectionActions(),
             { y: 12, opacity: 0 },
             { y: 0, opacity: 1, duration: 0.5, delay: 0.18, stagger: 0.05, ease: "power2.out" }
           );
@@ -391,6 +436,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function returnHome() {
+    if (!window.gsap || REDUCED_MOTION) {
+      collectionScreen.classList.remove("is-active");
+      introScreen.classList.add("is-active");
+      return;
+    }
+
     gsap.to(collectionScreen, {
       opacity: 0,
       duration: 0.4,
@@ -408,37 +459,42 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================== */
 
   function openLetter(index) {
+    if (isOpening) return;
+
+    isOpening = true;
+    setModalLock(true);
     activeIndex = normalizeIndex(index);
     const carta = CARTAS[activeIndex];
 
-    swiper.slideTo(activeIndex);
-    openingSealIcon.innerHTML = openingSealSvg(carta.tipoSello);
+    if (swiper) swiper.slideTo(activeIndex);
+    persistActiveIndex();
+    openingSealIcon.innerHTML = openingSealSvg(carta.sello);
 
     openingOverlay.classList.add("is-active");
     openingOverlay.setAttribute("aria-hidden", "false");
 
-    playOpeningSound(carta.tipoSello);
+    playOpeningSound(carta.sello);
+
+    if (!window.gsap || REDUCED_MOTION) {
+      finishOpening(carta);
+      return;
+    }
 
     gsap.set(".opening-envelope", { opacity: 1, scale: 0.78, y: 28, rotate: -1 });
     gsap.set(".opening-envelope__flap", { rotateX: 0, zIndex: 6 });
-    gsap.set(".opening-envelope__paper", { yPercent: 0, opacity: 1, zIndex: 3 });
+    gsap.set(".opening-envelope__paper", { yPercent: 5, opacity: 1, scale: 0.96, rotate: 0, zIndex: 3 });
+    gsap.set(".opening-envelope__paper span", {
+      opacity: 0.56,
+      scaleX: 0.86,
+      transformOrigin: "left center"
+    });
     gsap.set(".opening-envelope__seal", { scale: 1, opacity: 1, y: 0 });
     gsap.set(".opening-light", { scale: 0.7, opacity: 0 });
     gsap.set(".opening-overlay p", { y: 8, opacity: 0 });
 
     gsap.timeline({
       defaults: { ease: "power2.out" },
-      onComplete: () => {
-        openingOverlay.classList.remove("is-active");
-        openingOverlay.setAttribute("aria-hidden", "true");
-
-        const wasNewRead = markAsRead(carta.id);
-        if (wasNewRead && readIds.length === CARTAS.length) {
-          pendingFinalCelebration = true;
-        }
-
-        showLetterReader(carta);
-      }
+      onComplete: () => finishOpening(carta)
     })
       .to(".opening-envelope", {
         scale: 1,
@@ -465,88 +521,147 @@ document.addEventListener("DOMContentLoaded", () => {
         ease: "power2.in"
       })
       .to(".opening-envelope__flap", {
-        rotateX: 184,
+        rotateX: 188,
         duration: 0.68,
         ease: "power2.inOut"
       }, "-=0.06")
       .set(".opening-envelope__flap", { zIndex: 2 })
       .set(".opening-envelope__paper", { zIndex: 7 })
       .to(".opening-envelope__paper", {
-        yPercent: -68,
-        duration: 0.74,
+        yPercent: -74,
+        scale: 1,
+        duration: 0.82,
         ease: "power3.out"
-      }, "-=0.28")
+      }, "+=0.02")
+      .to(".opening-envelope__paper span", {
+        opacity: 0.28,
+        scaleX: 1,
+        duration: 0.32,
+        stagger: 0.04,
+        ease: "power2.out"
+      }, "-=0.68")
       .to(".opening-light", {
         scale: 1.65,
         opacity: 1,
         duration: 0.42,
         ease: "power2.out"
+      }, "-=0.52")
+      .to(".opening-overlay p", {
+        y: -4,
+        opacity: 0.88,
+        duration: 0.22
       }, "-=0.34")
       .to(".opening-envelope", {
         opacity: 0,
         scale: 1.05,
+        y: -8,
         duration: 0.24
       }, "+=0.06");
   }
 
+  function finishOpening(carta) {
+    isOpening = false;
+    openingOverlay.classList.remove("is-active");
+    openingOverlay.setAttribute("aria-hidden", "true");
+
+    const wasNewRead = markAsRead(carta.id);
+    if (wasNewRead && readIds.length === CARTAS.length && !state.finalShown) {
+      pendingFinalCelebration = true;
+    }
+
+    showLetterReader(carta);
+  }
+
   function showLetterReader(carta) {
+    lastFocusedElement = document.activeElement;
     letterTitle.textContent = displayLetterName(carta);
-    letterImage.src = carta.imagen;
-    letterImage.alt = `Imagen escaneada de ${displayLetterName(carta)}`;
+    letterImage.alt = carta.disponible
+      ? `Imagen escaneada de ${displayLetterName(carta)}`
+      : `Carta pendiente de ${displayLetterName(carta)}`;
 
     letterModal.hidden = false;
+    setModalLock(true);
 
+    let prepared = false;
     const prepareImage = () => {
+      if (prepared) return;
+      prepared = true;
       setZoom(1, { preserveScroll: false });
       letterStage.scrollTo({ top: 0, left: 0 });
     };
 
-    if (letterImage.complete) {
+    letterImage.onload = () => requestAnimationFrame(prepareImage);
+    letterImage.onerror = () => {
+      letterImage.onerror = null;
+      letterImage.src = createPlaceholderDataUri(carta);
+    };
+
+    letterImage.src = getLetterSource(carta);
+    if (letterImage.complete && letterImage.naturalWidth) {
       requestAnimationFrame(prepareImage);
-    } else {
-      letterImage.addEventListener("load", prepareImage, { once: true });
     }
 
-    gsap.fromTo(
-      ".letter-reader",
-      { y: 22, scale: 0.97, opacity: 0 },
-      { y: 0, scale: 1, opacity: 1, duration: 0.42, ease: "power2.out" }
-    );
+    requestAnimationFrame(() => {
+      letterStage.focus({ preventScroll: true });
+    });
+
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.fromTo(
+        ".letter-reader",
+        { y: 20, scale: 0.98, opacity: 0 },
+        { y: 0, scale: 1, opacity: 1, duration: 0.38, ease: "power2.out" }
+      );
+    }
   }
 
   function closeLetterModal() {
     if (letterModal.hidden) return;
 
-    gsap.to(".letter-reader", {
-      y: 14,
-      opacity: 0,
-      duration: 0.22,
-      ease: "power2.in",
-      onComplete: () => {
-        letterModal.hidden = true;
-        gsap.set(".letter-reader", { y: 0, opacity: 1 });
+    const finish = () => {
+      letterModal.hidden = true;
+      if (window.gsap) gsap.set(".letter-reader", { y: 0, opacity: 1, scale: 1 });
 
-        if (pendingFinalCelebration) {
-          pendingFinalCelebration = false;
-          showFinalCelebration();
-        }
+      if (pendingFinalCelebration) {
+        pendingFinalCelebration = false;
+        showFinalCelebration();
+        return;
       }
-    });
+
+      setModalLock(false);
+      restoreFocus();
+    };
+
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.to(".letter-reader", {
+        y: 14,
+        opacity: 0,
+        duration: 0.2,
+        ease: "power2.in",
+        onComplete: finish
+      });
+      return;
+    }
+
+    finish();
   }
 
   function openAdjacentLetter(step) {
+    if (isOpening) return;
+
     if (!letterModal.hidden) {
       letterModal.hidden = true;
-      gsap.set(".letter-reader", { y: 0, opacity: 1, scale: 1 });
+      if (window.gsap) gsap.set(".letter-reader", { y: 0, opacity: 1, scale: 1 });
     }
 
     openLetter(activeIndex + step);
   }
 
   function openRandomUnreadLetter() {
+    if (isOpening) return;
+
     const unreadIndexes = CARTAS
       .map((carta, index) => ({ carta, index }))
-      .filter(({ carta }) => !readIds.includes(carta.id))
+      .filter(({ carta }) => !readIds.includes(letterKey(carta)))
       .map(({ index }) => index);
 
     const options = unreadIndexes.length
@@ -562,10 +677,12 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================== */
 
   function markAsRead(id) {
-    if (readIds.includes(id)) return false;
+    const key = String(id);
+    if (readIds.includes(key)) return false;
 
-    readIds.push(id);
-    saveReadIds();
+    readIds.push(key);
+    state.readIds = readIds;
+    saveState();
     refreshReadState();
     updateProgress();
 
@@ -587,32 +704,64 @@ document.addEventListener("DOMContentLoaded", () => {
     progressBar.style.width = `${percent}%`;
   }
 
-  function loadReadIds() {
-    try {
-      const saved = JSON.parse(readStorage.getItem(STORAGE_KEY));
+  function persistActiveIndex() {
+    state.activeIndex = activeIndex;
+    saveState();
+  }
 
-      return Array.isArray(saved)
-        ? saved.filter((id) => CARTAS.some((carta) => carta.id === id))
-        : [];
+  function loadState() {
+    const fallback = {
+      readIds: loadLegacyReadIds(),
+      activeIndex: 0,
+      finalShown: false,
+      videoDiscovered: false,
+      soundEnabled: true
+    };
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (!saved || typeof saved !== "object") return fallback;
+
+      return {
+        ...fallback,
+        ...saved,
+        readIds: normalizeReadIds(saved.readIds)
+      };
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        readIds,
+        activeIndex,
+        finalShown: Boolean(state.finalShown),
+        videoDiscovered: Boolean(state.videoDiscovered),
+        soundEnabled
+      }));
+    } catch {
+      // Si el navegador bloquea storage, la experiencia sigue funcionando en memoria.
+    }
+  }
+
+  function loadLegacyReadIds() {
+    try {
+      const raw = localStorage.getItem(LEGACY_READ_KEY) || sessionStorage.getItem(LEGACY_READ_KEY);
+      const saved = JSON.parse(raw);
+      return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
     }
   }
 
-  function saveReadIds() {
-    try {
-      readStorage.setItem(STORAGE_KEY, JSON.stringify(readIds));
-    } catch {
-      // Si el navegador bloquea storage, el estado sigue funcionando en memoria.
-    }
-  }
+  function normalizeReadIds(ids) {
+    const validIds = new Set(CARTAS.map((carta) => letterKey(carta)));
 
-  function clearLegacyReadState() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Algunos navegadores privados pueden bloquear el acceso a localStorage.
-    }
+    return Array.isArray(ids)
+      ? [...new Set(ids.map(String).filter((id) => validIds.has(id)))]
+      : [];
   }
 
   /* ========================================================
@@ -638,7 +787,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     requestAnimationFrame(() => {
       if (!preserveScroll) {
-        letterStage.scrollTo({ top: 0, left: Math.max(0, (letterStage.scrollWidth - letterStage.clientWidth) / 2) });
+        letterStage.scrollTo({
+          top: 0,
+          left: Math.max(0, (letterStage.scrollWidth - letterStage.clientWidth) / 2)
+        });
         return;
       }
 
@@ -648,73 +800,179 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getBaseLetterWidth() {
-    const available = Math.max(220, letterStage.clientWidth - 48);
-    return Math.min(available, 820);
+    const naturalWidth = letterImage.naturalWidth || 1240;
+    const naturalHeight = letterImage.naturalHeight || 1754;
+    const ratio = naturalWidth / Math.max(1, naturalHeight);
+    const availableWidth = Math.max(260, letterStage.clientWidth - 18);
+    const availableHeight = Math.max(260, letterStage.clientHeight - 18);
+    const widthByHeight = availableHeight * ratio;
+
+    return Math.min(1040, availableWidth, widthByHeight || availableWidth);
   }
 
   /* ========================================================
-     FINAL
+     FINAL + VIDEO
   ======================================================== */
 
   function showFinalCelebration() {
+    state.finalShown = true;
+    saveState();
+
     finalModal.hidden = false;
+    setModalLock(true);
 
-    if (typeof confetti === "function") {
-      const end = Date.now() + 1300;
+    requestAnimationFrame(() => closeFinalButton.focus({ preventScroll: true }));
 
-      const frame = () => {
-        confetti({
-          particleCount: 2,
-          angle: 62,
-          spread: 52,
-          scalar: 0.72,
-          origin: { x: 0, y: 0.72 },
-          colors: ["#f4d2b6", "#ba6756", "#d7ae72", "#fff4df"]
-        });
-
-        confetti({
-          particleCount: 2,
-          angle: 118,
-          spread: 52,
-          scalar: 0.72,
-          origin: { x: 1, y: 0.72 },
-          colors: ["#f4d2b6", "#ba6756", "#d7ae72", "#fff4df"]
-        });
-
-        if (Date.now() < end) requestAnimationFrame(frame);
-      };
-
-      frame();
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.fromTo(
+        ".final-modal__card",
+        { y: 24, opacity: 0, scale: 0.96 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.52, ease: "power2.out" }
+      );
     }
-
-    gsap.fromTo(
-      ".final-modal__card",
-      { y: 26, opacity: 0, scale: 0.94 },
-      { y: 0, opacity: 1, scale: 1, duration: 0.58, ease: "power2.out" }
-    );
   }
 
-  function closeFinalModal() {
+  function closeFinalModal(options = {}) {
+    const { showVideo = false } = options;
     if (finalModal.hidden) return;
 
-    gsap.to(".final-modal__card", {
-      y: 12,
-      opacity: 0,
-      duration: 0.22,
-      ease: "power2.in",
-      onComplete: () => {
-        finalModal.hidden = true;
-        gsap.set(".final-modal__card", { y: 0, opacity: 1 });
+    const finish = () => {
+      finalModal.hidden = true;
+      if (window.gsap) gsap.set(".final-modal__card", { y: 0, opacity: 1, scale: 1 });
+
+      if (showVideo) {
+        showVideoSurprise({ rememberFocus: false });
+        return;
       }
+
+      setModalLock(false);
+      restoreFocus();
+    };
+
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.to(".final-modal__card", {
+        y: 12,
+        opacity: 0,
+        duration: 0.2,
+        ease: "power2.in",
+        onComplete: finish
+      });
+      return;
+    }
+
+    finish();
+  }
+
+  function showVideoSurprise(options = {}) {
+    const { rememberFocus = true } = options;
+    if (rememberFocus) lastFocusedElement = document.activeElement;
+    state.videoDiscovered = true;
+    saveState();
+    updateVideoReplayVisibility();
+
+    videoModal.hidden = false;
+    setModalLock(true);
+    prepareVideo();
+
+    requestAnimationFrame(() => {
+      const closeButton = videoModal.querySelector("[data-close-video]");
+      closeButton?.focus({ preventScroll: true });
     });
+
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.fromTo(
+        ".video-card",
+        { y: 24, opacity: 0, scale: 0.96 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.52, ease: "power2.out" }
+      );
+    }
+  }
+
+  function closeVideoModal() {
+    if (videoModal.hidden) return;
+
+    const finish = () => {
+      videoModal.hidden = true;
+      if (window.gsap) gsap.set(".video-card", { y: 0, opacity: 1, scale: 1 });
+      resetVideo();
+      setModalLock(false);
+      restoreFocus();
+    };
+
+    if (window.gsap && !REDUCED_MOTION) {
+      gsap.to(".video-card", {
+        y: 12,
+        opacity: 0,
+        duration: 0.2,
+        ease: "power2.in",
+        onComplete: finish
+      });
+      return;
+    }
+
+    finish();
+  }
+
+  function prepareVideo() {
+    videoPendingState.hidden = true;
+    surpriseVideo.hidden = false;
+    surpriseVideo.removeAttribute("src");
+    surpriseVideo.load();
+
+    if (window.location.protocol === "file:") {
+      showVideoPendingState();
+      return;
+    }
+
+    surpriseVideo.src = VIDEO_SORPRESA;
+    surpriseVideo.load();
+  }
+
+  function showVideoPendingState() {
+    resetVideo();
+    surpriseVideo.hidden = true;
+    videoPendingState.hidden = false;
+  }
+
+  function resetVideo() {
+    surpriseVideo.pause();
+    surpriseVideo.removeAttribute("src");
+    surpriseVideo.load();
+  }
+
+  function updateVideoReplayVisibility() {
+    replayVideoButton.hidden = !state.videoDiscovered;
   }
 
   /* ========================================================
      AUDIO LIVIANO
   ======================================================== */
 
+  function syncSoundButton() {
+    const icon = soundButton.querySelector("i");
+
+    icon.className = soundEnabled
+      ? "ph ph-speaker-high"
+      : "ph ph-speaker-slash";
+
+    soundButton.setAttribute(
+      "aria-label",
+      soundEnabled ? "Desactivar sonidos" : "Activar sonidos"
+    );
+  }
+
+  function unlockAudio() {
+    audioUnlocked = true;
+
+    try {
+      if (audioContext?.state === "suspended") audioContext.resume();
+    } catch {
+      // El audio es decorativo; si el navegador lo bloquea, no afecta la experiencia.
+    }
+  }
+
   function playTone(frequency = 440, duration = 0.08) {
-    if (!soundEnabled) return;
+    if (!soundEnabled || !audioUnlocked) return;
 
     try {
       audioContext ??= new (window.AudioContext || window.webkitAudioContext)();
@@ -736,7 +994,7 @@ document.addEventListener("DOMContentLoaded", () => {
       oscillator.start();
       oscillator.stop(audioContext.currentTime + duration + 0.03);
     } catch {
-      // La experiencia continúa aunque el navegador bloquee el audio.
+      // La experiencia continua aunque el navegador bloquee el audio.
     }
   }
 
@@ -745,10 +1003,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const motifs = {
       cookie: [330, 415, 523],
-      music: [392, 494, 659],
-      heart: [349, 440, 587]
+      "nota-musical": [392, 494, 659],
+      flor: [349, 392, 523],
+      sol: [440, 554, 740],
+      neutro: [349, 440, 587]
     };
-    const notes = motifs[type] ?? motifs.heart;
+    const notes = motifs[type] ?? motifs.neutro;
 
     notes.forEach((frequency, index) => {
       window.setTimeout(() => playTone(frequency, 0.075), index * 72);
@@ -761,13 +1021,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function normalizeIndex(index) {
     const total = CARTAS.length;
-    return ((index % total) + total) % total;
+    const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
+    return ((safeIndex % total) + total) % total;
+  }
+
+  function letterKey(carta) {
+    return String(carta.id);
   }
 
   function displayLetterName(carta) {
-    return carta.persona.toLowerCase().startsWith("carta")
-      ? carta.persona
-      : `Carta de ${carta.persona}`;
+    return carta.nombre;
+  }
+
+  function getLetterSource(carta) {
+    return carta.disponible
+      ? carta.archivo
+      : createPlaceholderDataUri(carta);
+  }
+
+  function createPlaceholderDataUri(carta) {
+    const name = escapeSvg(carta.nombre);
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1754">
+        <defs>
+          <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+            <stop stop-color="#fffdf8"/>
+            <stop offset="1" stop-color="#f4ead7"/>
+          </linearGradient>
+          <radialGradient id="glow" cx=".5" cy=".15" r=".65">
+            <stop stop-color="#fff8e8" stop-opacity=".95"/>
+            <stop offset=".55" stop-color="#f6e3c8" stop-opacity=".35"/>
+            <stop offset="1" stop-color="#f6e3c8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1240" height="1754" fill="url(#paper)"/>
+        <rect width="1240" height="1754" fill="url(#glow)"/>
+        <rect x="52" y="52" width="1136" height="1650" rx="22" fill="none" stroke="#cfad72" stroke-width="4"/>
+        <rect x="76" y="76" width="1088" height="1602" rx="18" fill="none" stroke="#fff3d5" stroke-width="5" opacity=".7"/>
+        <text x="620" y="250" text-anchor="middle" font-family="Georgia, serif" font-size="86" fill="#6b3b35">${name}</text>
+        <text x="620" y="365" text-anchor="middle" font-family="Arial, sans-serif" font-size="31" fill="#7c6b5e">Esta carta todavía está esperando su momento.</text>
+        <path d="M145 585 C340 535 520 635 780 580 M145 715 C390 655 590 760 1010 680 M145 845 C340 800 575 860 900 830 M145 975 C380 935 670 1010 1050 960 M145 1105 C390 1060 610 1128 940 1100"
+              fill="none" stroke="#897563" stroke-width="13" stroke-linecap="round" opacity=".22"/>
+        <path d="M483 1342 C520 1300 576 1296 620 1348 C664 1296 720 1300 757 1342 C704 1394 661 1428 620 1456 C579 1428 536 1394 483 1342Z"
+              fill="none" stroke="#b86a5d" stroke-width="9" stroke-linejoin="round" opacity=".52"/>
+        <text x="620" y="1530" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#8a7a6a">Guardada con cariño para Agustina.</text>
+      </svg>
+    `;
+
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
   }
 
   function openingSealSvg(type) {
@@ -782,7 +1083,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const symbolPath = (d) => `
       <path d="${d}" fill="none" stroke="#5f201b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".34"/>
       <path d="${d}" fill="none" stroke="#f4b29f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".76"/>
-      <path d="${d}" fill="none" stroke="#ffd6c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/>
+      <path d="${d}" fill="none" stroke="#ffd6c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".34"/>
     `;
 
     const circleSymbol = (extra = "") => `
@@ -808,18 +1109,29 @@ document.addEventListener("DOMContentLoaded", () => {
           <circle cx="-12" cy="13" r="2.2" fill="#f2ad98" opacity=".82"/>
         </g>
       `,
-      flower: symbolPath("M0-24C13-24 15-9 6-2C18-10 29-2 23 10C17 20 4 13 1 5C4 18-6 28-16 22C-26 16-17 3-8 0C-21 3-28-9-20-18C-13-27-3-16 0-7C-2-18 0-24 0-24Z"),
-      star: symbolPath("M0-26 8-8 27-7 12 5 16 24 0 14-17 24-12 5-27-7-8-8Z"),
-      moon: symbolPath("M11-25C-13-18-19 15 8 25C-16 28-30 7-22-14C-15-29 2-32 11-25Z"),
-      sun: `${circleSymbol()}${symbolPath("M0-32v9M0 23v9M-32 0h9M23 0h9M-22-22l7 7M15 15l7 7M22-22l-7 7M-15 15l-7 7")}`,
-      leaf: symbolPath("M-24 21C-19-11 4-26 25-21C21 6 8 22-24 21ZM-20 18C-4 6 8-3 22-18"),
-      music: symbolPath("M5-21v30c0 8-16 12-19 3c-3-8 10-16 19-8M5-21l19-4v29c0 8-16 12-19 3"),
-      sparkle: symbolPath("M0-29C4-10 10-4 29 0C10 4 4 10 0 29C-4 10-10 4-29 0C-10-4-4-10 0-29Z"),
-      heart: symbolPath("M0 23S-26 8-26-8C-26-24-5-27 0-12C5-27 26-24 26-8C26 8 0 23 0 23Z"),
-      rose: symbolPath("M0 22C-21 19-28 0-16-16C-5-30 18-24 24-7C30 11 15 26 0 22ZM-16-16C-3-12 4-3 0 9M24-7C10-10 2-4 0 9")
+      flor: symbolPath("M0-24C13-24 15-9 6-2C18-10 29-2 23 10C17 20 4 13 1 5C4 18-6 28-16 22C-26 16-17 3-8 0C-21 3-28-9-20-18C-13-27-3-16 0-7C-2-18 0-24 0-24Z"),
+      sol: `${circleSymbol()}${symbolPath("M0-32v9M0 23v9M-32 0h9M23 0h9M-22-22l7 7M15 15l7 7M22-22l-7 7M-15 15l-7 7")}`,
+      "nota-musical": symbolPath("M5-21v30c0 8-16 12-19 3c-3-8 10-16 19-8M5-21l19-4v29c0 8-16 12-19 3"),
+      neutro: symbolPath("M0-28C5-11 11-5 28 0C11 5 5 11 0 28C-5 11-11 5-28 0C-11-5-5-11 0-28Z")
     };
 
-    return icons[type] ?? icons.heart;
+    return icons[type] ?? icons.neutro;
+  }
+
+  function setModalLock(locked) {
+    document.body.classList.toggle("is-modal-open", locked);
+  }
+
+  function visibleCollectionActions() {
+    return [".active-envelope-meta", ".ghost-button", ".replay-video-button:not([hidden])"]
+      .flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+  }
+
+  function restoreFocus() {
+    if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+      lastFocusedElement.focus({ preventScroll: true });
+    }
+    lastFocusedElement = null;
   }
 
   function escapeHtml(value) {
@@ -829,5 +1141,9 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function escapeSvg(value) {
+    return escapeHtml(value);
   }
 });
