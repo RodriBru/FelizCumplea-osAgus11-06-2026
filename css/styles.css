@@ -1000,11 +1000,8 @@ img {
   border-radius: 18px;
   padding: clamp(6px, 1.4vw, 16px);
   background:
-    linear-gradient(45deg, rgba(171, 139, 96, .07) 25%, transparent 25% 75%, rgba(171, 139, 96, .07) 75%),
-    linear-gradient(45deg, rgba(171, 139, 96, .07) 25%, transparent 25% 75%, rgba(171, 139, 96, .07) 75%),
-    #f7efe3;
-  background-position: 0 0, 14px 14px, 0 0;
-  background-size: 28px 28px, 28px 28px, auto;
+    radial-gradient(circle at 50% 10%, rgba(255, 253, 246, .96), transparent 48%),
+    linear-gradient(180deg, rgba(255, 250, 241, .96), rgba(243, 229, 209, .98));
   overscroll-behavior: contain;
   scroll-behavior: smooth;
   text-align: center;
@@ -1135,10 +1132,52 @@ img {
   object-fit: contain;
 }
 
+.video-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.video-control-button,
+.video-volume-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid rgba(255, 243, 218, .18);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: rgba(255, 250, 241, .9);
+  font-size: .88rem;
+  font-weight: 850;
+  background: rgba(255, 250, 241, .08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .1),
+    0 10px 24px rgba(0, 0, 0, .16);
+  backdrop-filter: blur(12px);
+  transition: transform .22s var(--ease), background .22s var(--ease), border-color .22s var(--ease);
+}
+
+.video-control-button:hover,
+.video-volume-control:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 243, 218, .3);
+  background: rgba(255, 250, 241, .13);
+}
+
+.video-volume-control input {
+  width: min(25vw, 150px);
+  accent-color: #f0c58d;
+}
+
 .video-pending-state {
   display: grid;
   place-items: center;
-  gap: 10px;
   min-height: min(52vh, 430px);
   padding: clamp(28px, 8vw, 54px);
   color: rgba(255, 250, 241, .86);
@@ -1146,20 +1185,8 @@ img {
 
 .video-pending-state i {
   color: #f1c9ad;
-  font-size: 3rem;
-  opacity: .9;
-}
-
-.video-pending-state p {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.45rem, 5vw, 2rem);
-}
-
-.video-pending-state span {
-  max-width: 440px;
-  color: rgba(255, 250, 241, .72);
-  font-size: .94rem;
-  line-height: 1.55;
+  font-size: clamp(2.6rem, 9vw, 4.2rem);
+  opacity: .74;
 }
 
 .final-modal::before {
@@ -1231,6 +1258,34 @@ img {
   .intro-panel {
     padding-top: 14px;
     padding-bottom: 14px;
+  }
+
+  .video-modal {
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .video-card {
+    width: min(98vw, 1120px);
+    max-height: 96dvh;
+    gap: 7px;
+    border-radius: 22px;
+    padding: 12px;
+  }
+
+  .video-card h2 {
+    font-size: clamp(1.35rem, 4.8vw, 2.1rem);
+  }
+
+  .video-card p:not(.eyebrow) {
+    display: none;
+  }
+
+  .video-frame video {
+    max-height: calc(100dvh - 138px);
+  }
+
+  .video-pending-state {
+    min-height: calc(100dvh - 138px);
   }
 }
 
@@ -1372,6 +1427,25 @@ img {
 
   .video-frame video {
     max-height: 58dvh;
+  }
+
+  .video-controls {
+    gap: 8px;
+  }
+
+  .video-control-button,
+  .video-volume-control {
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: .82rem;
+  }
+
+  .video-volume-control {
+    flex: 1 1 100%;
+  }
+
+  .video-volume-control input {
+    width: min(50vw, 190px);
   }
 }
 

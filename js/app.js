@@ -47,8 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoModal = document.querySelector("#videoModal");
   const surpriseVideo = document.querySelector("#surpriseVideo");
   const videoPendingState = document.querySelector("#videoPendingState");
+  const videoControls = document.querySelector("#videoControls");
+  const videoPlayButton = document.querySelector("#videoPlayButton");
+  const videoVolumeControl = document.querySelector("#videoVolumeControl");
+  const videoFullscreenButton = document.querySelector("#videoFullscreenButton");
 
   let swiper;
+  resetStoredStateOnReload();
   let state = loadState();
   let activeIndex = normalizeIndex(state.activeIndex);
   let readIds = normalizeReadIds(state.readIds);
@@ -79,9 +84,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   startButton.addEventListener("click", () => {
     unlockAudio();
+    playSfx("enter");
     enterCollection();
   });
-  homeButton.addEventListener("click", returnHome);
+  homeButton.addEventListener("click", () => {
+    unlockAudio();
+    playSfx("close");
+    returnHome();
+  });
   openActiveButton.addEventListener("click", () => {
     unlockAudio();
     openLetter(activeIndex);
@@ -90,8 +100,14 @@ document.addEventListener("DOMContentLoaded", () => {
     unlockAudio();
     openRandomUnreadLetter();
   });
-  replayVideoButton.addEventListener("click", showVideoSurprise);
-  closeFinalButton.addEventListener("click", () => closeFinalModal({ showVideo: true }));
+  replayVideoButton.addEventListener("click", () => {
+    unlockAudio();
+    showVideoSurprise();
+  });
+  closeFinalButton.addEventListener("click", () => {
+    unlockAudio();
+    closeFinalModal({ showVideo: true });
+  });
 
   soundButton.addEventListener("click", () => {
     unlockAudio();
@@ -100,15 +116,30 @@ document.addEventListener("DOMContentLoaded", () => {
     saveState();
     syncSoundButton();
 
-    if (soundEnabled) playTone(520, 0.08);
+    if (soundEnabled) playSfx("toggle");
   });
 
-  previousLetterButton.addEventListener("click", () => openAdjacentLetter(-1));
-  nextLetterButton.addEventListener("click", () => openAdjacentLetter(1));
+  previousLetterButton.addEventListener("click", () => {
+    unlockAudio();
+    openAdjacentLetter(-1);
+  });
+  nextLetterButton.addEventListener("click", () => {
+    unlockAudio();
+    openAdjacentLetter(1);
+  });
 
-  zoomOutButton.addEventListener("click", () => changeZoom(-ZOOM_STEP));
-  zoomInButton.addEventListener("click", () => changeZoom(ZOOM_STEP));
-  resetZoomButton.addEventListener("click", () => setZoom(1));
+  zoomOutButton.addEventListener("click", () => {
+    playSfx("tick");
+    changeZoom(-ZOOM_STEP);
+  });
+  zoomInButton.addEventListener("click", () => {
+    playSfx("tick");
+    changeZoom(ZOOM_STEP);
+  });
+  resetZoomButton.addEventListener("click", () => {
+    playSfx("tick");
+    setZoom(1);
+  });
 
   letterStage.addEventListener("wheel", (event) => {
     if (!event.ctrlKey) return;
@@ -129,6 +160,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   surpriseVideo.addEventListener("error", showVideoPendingState);
+  surpriseVideo.addEventListener("loadedmetadata", showVideoReadyState);
+  surpriseVideo.addEventListener("play", updateVideoPlayButton);
+  surpriseVideo.addEventListener("pause", updateVideoPlayButton);
+  surpriseVideo.addEventListener("volumechange", syncVideoVolumeControl);
+  videoPlayButton.addEventListener("click", toggleVideoPlayback);
+  videoVolumeControl.addEventListener("input", updateVideoVolume);
+  videoFullscreenButton.addEventListener("click", enterVideoFullscreen);
 
   document.addEventListener("keydown", (event) => {
     if (!videoModal.hidden && event.key === "Escape") {
@@ -356,7 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
           activeIndex = this.activeIndex;
           persistActiveIndex();
           updateActiveMeta(true);
-          playTone(370, 0.035);
+          playSfx("swipe");
         }
       }
     });
@@ -383,8 +421,6 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================== */
 
   function enterCollection() {
-    playTone(630, 0.09);
-
     if (!window.gsap || REDUCED_MOTION) {
       introScreen.classList.remove("is-active");
       collectionScreen.classList.add("is-active");
@@ -563,6 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
     isOpening = false;
     openingOverlay.classList.remove("is-active");
     openingOverlay.setAttribute("aria-hidden", "true");
+    playSfx("letter");
 
     const wasNewRead = markAsRead(carta.id);
     if (wasNewRead && readIds.length === CARTAS.length && !state.finalShown) {
@@ -616,6 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function closeLetterModal() {
     if (letterModal.hidden) return;
+    playSfx("close");
 
     const finish = () => {
       letterModal.hidden = true;
@@ -732,6 +770,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function resetStoredStateOnReload() {
+    const navigation = performance.getEntriesByType?.("navigation")?.[0];
+    const isReload = navigation
+      ? navigation.type === "reload"
+      : performance.navigation?.type === performance.navigation?.TYPE_RELOAD;
+
+    if (!isReload) return;
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_READ_KEY);
+      sessionStorage.removeItem(LEGACY_READ_KEY);
+    } catch {
+      // Si storage esta bloqueado, no hay nada que resetear.
+    }
+  }
+
   function saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -817,6 +872,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function showFinalCelebration() {
     state.finalShown = true;
     saveState();
+    playSfx("success");
 
     finalModal.hidden = false;
     setModalLock(true);
@@ -866,6 +922,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function showVideoSurprise(options = {}) {
     const { rememberFocus = true } = options;
     if (rememberFocus) lastFocusedElement = document.activeElement;
+    playSfx("video");
     state.videoDiscovered = true;
     saveState();
     updateVideoReplayVisibility();
@@ -890,6 +947,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function closeVideoModal() {
     if (videoModal.hidden) return;
+    playSfx("close");
 
     const finish = () => {
       videoModal.hidden = true;
@@ -916,21 +974,28 @@ document.addEventListener("DOMContentLoaded", () => {
   function prepareVideo() {
     videoPendingState.hidden = true;
     surpriseVideo.hidden = false;
+    videoControls.hidden = false;
     surpriseVideo.removeAttribute("src");
     surpriseVideo.load();
 
-    if (window.location.protocol === "file:") {
-      showVideoPendingState();
-      return;
-    }
-
     surpriseVideo.src = VIDEO_SORPRESA;
     surpriseVideo.load();
+    updateVideoPlayButton();
+    syncVideoVolumeControl();
+  }
+
+  function showVideoReadyState() {
+    videoPendingState.hidden = true;
+    surpriseVideo.hidden = false;
+    videoControls.hidden = false;
+    updateVideoPlayButton();
+    syncVideoVolumeControl();
   }
 
   function showVideoPendingState() {
     resetVideo();
     surpriseVideo.hidden = true;
+    videoControls.hidden = true;
     videoPendingState.hidden = false;
   }
 
@@ -938,6 +1003,74 @@ document.addEventListener("DOMContentLoaded", () => {
     surpriseVideo.pause();
     surpriseVideo.removeAttribute("src");
     surpriseVideo.load();
+    updateVideoPlayButton();
+  }
+
+  async function toggleVideoPlayback() {
+    unlockAudio();
+    playSfx("tap");
+
+    try {
+      if (surpriseVideo.paused) {
+        await surpriseVideo.play();
+        return;
+      }
+
+      surpriseVideo.pause();
+    } catch {
+      // iOS puede bloquear play si el gesto no llega al video; los controles nativos siguen disponibles.
+    } finally {
+      updateVideoPlayButton();
+    }
+  }
+
+  function updateVideoPlayButton() {
+    const icon = videoPlayButton.querySelector("i");
+    const label = videoPlayButton.querySelector("span");
+    const isPlaying = !surpriseVideo.paused && !surpriseVideo.ended;
+
+    icon.className = isPlaying ? "ph ph-pause" : "ph ph-play";
+    label.textContent = isPlaying ? "Pausar" : "Reproducir";
+  }
+
+  function updateVideoVolume() {
+    unlockAudio();
+    const volume = Math.min(1, Math.max(0, Number(videoVolumeControl.value)));
+
+    try {
+      surpriseVideo.volume = volume;
+      surpriseVideo.muted = volume === 0;
+    } catch {
+      // En iPhone el volumen del video lo gobierna iOS; dejamos el control nativo como respaldo.
+    }
+  }
+
+  function syncVideoVolumeControl() {
+    const value = surpriseVideo.muted ? 0 : surpriseVideo.volume;
+    videoVolumeControl.value = String(Number.isFinite(value) ? value : 1);
+  }
+
+  function enterVideoFullscreen() {
+    unlockAudio();
+    playSfx("tap");
+
+    try {
+      if (surpriseVideo.webkitEnterFullscreen) {
+        surpriseVideo.webkitEnterFullscreen();
+        return;
+      }
+
+      if (surpriseVideo.requestFullscreen) {
+        surpriseVideo.requestFullscreen();
+        return;
+      }
+
+      if (videoModal.requestFullscreen) {
+        videoModal.requestFullscreen();
+      }
+    } catch {
+      // Si el navegador no permite fullscreen por API, quedan los controles nativos del video.
+    }
   }
 
   function updateVideoReplayVisibility() {
@@ -961,58 +1094,195 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  function getAudioContext() {
+    const AudioConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioConstructor) return null;
+
+    audioContext ??= new AudioConstructor();
+    return audioContext;
+  }
+
   function unlockAudio() {
     audioUnlocked = true;
 
     try {
-      if (audioContext?.state === "suspended") audioContext.resume();
+      const context = getAudioContext();
+      if (!context) return;
+      if (context.state === "suspended") context.resume();
+
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      oscillator.frequency.setValueAtTime(24, context.currentTime);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.015);
     } catch {
       // El audio es decorativo; si el navegador lo bloquea, no afecta la experiencia.
     }
   }
 
-  function playTone(frequency = 440, duration = 0.08) {
+  function playTone(frequency = 440, duration = 0.08, options = {}) {
     if (!soundEnabled || !audioUnlocked) return;
 
     try {
-      audioContext ??= new (window.AudioContext || window.webkitAudioContext)();
-      if (audioContext.state === "suspended") audioContext.resume();
+      const context = getAudioContext();
+      if (!context) return;
+      if (context.state === "suspended") context.resume();
 
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
+      const {
+        delay = 0,
+        volume = 0.02,
+        type = "sine",
+        slideTo = null
+      } = options;
+      const startAt = context.currentTime + delay;
 
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequency;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
 
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.026, audioContext.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, startAt);
+      if (slideTo) {
+        oscillator.frequency.exponentialRampToValueAtTime(slideTo, startAt + duration);
+      }
+
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
 
       oscillator.connect(gain);
-      gain.connect(audioContext.destination);
+      gain.connect(context.destination);
 
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + duration + 0.03);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + duration + 0.035);
     } catch {
       // La experiencia continua aunque el navegador bloquee el audio.
     }
   }
 
-  function playOpeningSound(type) {
-    if (!soundEnabled) return;
+  function playNoise(duration = 0.12, options = {}) {
+    if (!soundEnabled || !audioUnlocked) return;
+
+    try {
+      const context = getAudioContext();
+      if (!context) return;
+      if (context.state === "suspended") context.resume();
+
+      const {
+        delay = 0,
+        volume = 0.016,
+        frequency = 1200,
+        filterType = "bandpass",
+        q = 0.8
+      } = options;
+      const frameCount = Math.max(1, Math.floor(context.sampleRate * duration));
+      const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let i = 0; i < frameCount; i += 1) {
+        const fade = 1 - (i / frameCount);
+        data[i] = (Math.random() * 2 - 1) * fade;
+      }
+
+      const source = context.createBufferSource();
+      const filter = context.createBiquadFilter();
+      const gain = context.createGain();
+      const startAt = context.currentTime + delay;
+
+      source.buffer = buffer;
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(frequency, startAt);
+      filter.Q.setValueAtTime(q, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(context.destination);
+      source.start(startAt);
+      source.stop(startAt + duration + 0.025);
+    } catch {
+      // La experiencia continua aunque el navegador bloquee el audio.
+    }
+  }
+
+  function playArpeggio(notes, step = 0.065, duration = 0.085, options = {}) {
+    const baseDelay = options.delay || 0;
+
+    notes.forEach((frequency, index) => {
+      playTone(frequency, duration, {
+        ...options,
+        delay: baseDelay + index * step
+      });
+    });
+  }
+
+  function playSfx(name, details = {}) {
+    if (!soundEnabled || !audioUnlocked) return;
 
     const motifs = {
       cookie: [330, 415, 523],
+      "doble-corazon": [392, 523, 659],
       "nota-musical": [392, 494, 659],
       flor: [349, 392, 523],
       sol: [440, 554, 740],
+      playa: [294, 392, 587],
+      "copa-vino": [330, 440, 587],
+      gimnasio: [247, 330, 494],
       neutro: [349, 440, 587]
     };
-    const notes = motifs[type] ?? motifs.neutro;
 
-    notes.forEach((frequency, index) => {
-      window.setTimeout(() => playTone(frequency, 0.075), index * 72);
-    });
+    switch (name) {
+      case "enter":
+        playNoise(0.08, { volume: 0.009, frequency: 2300, filterType: "highpass" });
+        playArpeggio([523, 659, 784, 1046], 0.046, 0.12, { volume: 0.017, type: "triangle" });
+        break;
+      case "swipe":
+        playNoise(0.08, { volume: 0.01, frequency: 1800, filterType: "highpass", q: 0.55 });
+        playTone(330, 0.04, { volume: 0.008, type: "triangle", slideTo: 370 });
+        break;
+      case "tap":
+        playTone(620, 0.055, { volume: 0.012, type: "triangle" });
+        break;
+      case "tick":
+        playTone(740, 0.035, { volume: 0.009, type: "triangle" });
+        break;
+      case "close":
+        playArpeggio([392, 311], 0.04, 0.075, { volume: 0.012, type: "sine" });
+        break;
+      case "letter":
+        playNoise(0.11, { delay: 0.01, volume: 0.011, frequency: 1500, filterType: "highpass" });
+        playArpeggio([523, 659, 880], 0.055, 0.11, { delay: 0.03, volume: 0.014, type: "triangle" });
+        break;
+      case "open": {
+        const notes = motifs[details.type] ?? motifs.neutro;
+        playNoise(0.18, { volume: 0.022, frequency: 950, filterType: "bandpass", q: 0.75 });
+        playTone(180, 0.08, { delay: 0.02, volume: 0.014, type: "sine", slideTo: 126 });
+        playArpeggio(notes, 0.078, 0.105, { delay: 0.12, volume: 0.017, type: "triangle" });
+        break;
+      }
+      case "success":
+        playNoise(0.12, { volume: 0.012, frequency: 2800, filterType: "highpass" });
+        playArpeggio([523, 659, 784, 988, 1175], 0.055, 0.12, { volume: 0.016, type: "triangle" });
+        break;
+      case "video":
+        playTone(196, 0.14, { volume: 0.013, type: "sine", slideTo: 247 });
+        playArpeggio([392, 494, 659], 0.07, 0.12, { delay: 0.04, volume: 0.013, type: "triangle" });
+        break;
+      case "toggle":
+        playArpeggio([520, 700], 0.045, 0.08, { volume: 0.013, type: "triangle" });
+        break;
+      default:
+        playTone(520, 0.06, { volume: 0.012, type: "triangle" });
+    }
+  }
+
+  function playOpeningSound(type) {
+    playSfx("open", { type });
   }
 
   /* ========================================================
@@ -1109,9 +1379,25 @@ document.addEventListener("DOMContentLoaded", () => {
           <circle cx="-12" cy="13" r="2.2" fill="#f2ad98" opacity=".82"/>
         </g>
       `,
+      "doble-corazon": symbolPath("M-29-6C-29-16-17-20-10-10C-3-20 9-16 9-6C9 5-3 13-10 20C-17 13-29 5-29-6ZM-4-6C-4-16 8-20 15-10C22-20 34-16 34-6C34 5 22 13 15 20C10 15 4 11 0 5"),
       flor: symbolPath("M0-24C13-24 15-9 6-2C18-10 29-2 23 10C17 20 4 13 1 5C4 18-6 28-16 22C-26 16-17 3-8 0C-21 3-28-9-20-18C-13-27-3-16 0-7C-2-18 0-24 0-24Z"),
       sol: `${circleSymbol()}${symbolPath("M0-32v9M0 23v9M-32 0h9M23 0h9M-22-22l7 7M15 15l7 7M22-22l-7 7M-15 15l-7 7")}`,
-      "nota-musical": symbolPath("M5-21v30c0 8-16 12-19 3c-3-8 10-16 19-8M5-21l19-4v29c0 8-16 12-19 3"),
+      "nota-musical": symbolPath("M-16-25V12C-16 21-32 24-35 15C-38 6-23 0-16 8M16-31V6C16 15 0 18-3 9C-6 0 9-5 16 2M-16-25C-4-19 5-23 16-31M-16-16C-4-10 5-14 16-22"),
+      playa: `
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="-19" cy="-19" r="10" stroke="#5f201b" stroke-width="9" opacity=".34"/>
+          <path d="M-19-34v6M-34-19h6M-30-30l5 5M-8-30l-5 5" stroke="#5f201b" stroke-width="9" opacity=".34"/>
+          <path d="M-31 9C-20 0-10 18 2 9C14 0 23 17 32 8M-31 24C-20 15-10 33 2 24C14 15 23 32 32 23" stroke="#5f201b" stroke-width="10" opacity=".34"/>
+
+          <circle cx="-19" cy="-19" r="10" stroke="#f4b29f" stroke-width="5.5" opacity=".78"/>
+          <path d="M-19-34v6M-34-19h6M-30-30l5 5M-8-30l-5 5" stroke="#f4b29f" stroke-width="5" opacity=".78"/>
+          <path d="M-31 9C-20 0-10 18 2 9C14 0 23 17 32 8M-31 24C-20 15-10 33 2 24C14 15 23 32 32 23" stroke="#f4b29f" stroke-width="6" opacity=".78"/>
+
+          <path d="M-31 9C-20 0-10 18 2 9C14 0 23 17 32 8M-31 24C-20 15-10 33 2 24C14 15 23 32 32 23" stroke="#ffd6c7" stroke-width="2" opacity=".34"/>
+        </g>
+      `,
+      "copa-vino": symbolPath("M-18-27H18C17-10 10 2 0 2C-10 2-17-10-18-27ZM-10-14C-4-10 5-10 11-14M0 2V24M-14 25H14"),
+      gimnasio: symbolPath("M-30 0H30M-37-13V13M-28-20V20M28-20V20M37-13V13M-20-8V8M20-8V8"),
       neutro: symbolPath("M0-28C5-11 11-5 28 0C11 5 5 11 0 28C-5 11-11 5-28 0C-11-5-5-11 0-28Z")
     };
 

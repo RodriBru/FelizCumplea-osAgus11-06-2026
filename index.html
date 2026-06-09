@@ -208,12 +208,28 @@
       <p>Dale play cuando estés lista.</p>
 
       <div class="video-frame">
-        <video id="surpriseVideo" controls preload="metadata" playsinline></video>
-        <div id="videoPendingState" class="video-pending-state" hidden>
+        <video id="surpriseVideo" controls preload="metadata" playsinline webkit-playsinline></video>
+        <div id="videoPendingState" class="video-pending-state" hidden aria-label="Video no disponible">
           <i class="ph ph-video-camera" aria-hidden="true"></i>
-          <p>El espacio del video ya está listo.</p>
-          <span>Cuando esté el archivo final, colocá <strong>video-sorpresa.mp4</strong> dentro de la carpeta <strong>video</strong>.</span>
         </div>
+      </div>
+
+      <div id="videoControls" class="video-controls" aria-label="Controles rápidos del video" hidden>
+        <button id="videoPlayButton" class="video-control-button" type="button">
+          <i class="ph ph-play" aria-hidden="true"></i>
+          <span>Reproducir</span>
+        </button>
+
+        <label class="video-volume-control">
+          <i class="ph ph-speaker-high" aria-hidden="true"></i>
+          <span>Volumen</span>
+          <input id="videoVolumeControl" type="range" min="0" max="1" step="0.05" value="1">
+        </label>
+
+        <button id="videoFullscreenButton" class="video-control-button" type="button">
+          <i class="ph ph-corners-out" aria-hidden="true"></i>
+          <span>Pantalla completa</span>
+        </button>
       </div>
     </article>
   </section>
