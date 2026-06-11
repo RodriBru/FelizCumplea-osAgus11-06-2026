@@ -362,6 +362,15 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================== */
 
   function initSwiper() {
+    if (!window.Swiper) {
+      swiper = null;
+      document.querySelector(".envelope-swiper")?.classList.add("is-fallback");
+      activeIndex = normalizeIndex(activeIndex);
+      persistActiveIndex();
+      updateActiveMeta(false);
+      return;
+    }
+
     swiper = new Swiper(".envelope-swiper", {
       effect: "coverflow",
       centeredSlides: true,
@@ -897,7 +906,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (window.gsap) gsap.set(".final-modal__card", { y: 0, opacity: 1, scale: 1 });
 
       if (showVideo) {
-        showVideoSurprise({ rememberFocus: false });
+        showVideoSurprise({ rememberFocus: false, fromFinal: true });
         return;
       }
 
@@ -920,7 +929,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showVideoSurprise(options = {}) {
-    const { rememberFocus = true } = options;
+    const { rememberFocus = true, fromFinal = false } = options;
     if (rememberFocus) lastFocusedElement = document.activeElement;
     playSfx("video");
     state.videoDiscovered = true;
@@ -928,6 +937,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateVideoReplayVisibility();
 
     videoModal.hidden = false;
+    videoModal.classList.toggle("is-final-transition", fromFinal);
     setModalLock(true);
     prepareVideo();
 
@@ -937,10 +947,24 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (window.gsap && !REDUCED_MOTION) {
+      const introDelay = fromFinal ? 0.28 : 0;
+
+      gsap.fromTo(
+        videoModal,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.68, ease: "power2.out" }
+      );
+
       gsap.fromTo(
         ".video-card",
-        { y: 24, opacity: 0, scale: 0.96 },
-        { y: 0, opacity: 1, scale: 1, duration: 0.52, ease: "power2.out" }
+        { y: fromFinal ? 34 : 24, opacity: 0, scale: fromFinal ? 0.94 : 0.96 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.72, delay: introDelay, ease: "power2.out" }
+      );
+
+      gsap.fromTo(
+        ".video-card__halo",
+        { scale: 0.78, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 1.05, delay: introDelay + 0.08, ease: "power2.out" }
       );
     }
   }
@@ -951,7 +975,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const finish = () => {
       videoModal.hidden = true;
-      if (window.gsap) gsap.set(".video-card", { y: 0, opacity: 1, scale: 1 });
+      videoModal.classList.remove("is-final-transition");
+      if (window.gsap) {
+        gsap.set(videoModal, { opacity: 1 });
+        gsap.set(".video-card", { y: 0, opacity: 1, scale: 1 });
+      }
       resetVideo();
       setModalLock(false);
       restoreFocus();
@@ -979,6 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
     surpriseVideo.load();
 
     surpriseVideo.src = VIDEO_SORPRESA;
+    surpriseVideo.volume = Math.min(1, Math.max(0, Number(videoVolumeControl.value)));
     surpriseVideo.load();
     updateVideoPlayButton();
     syncVideoVolumeControl();
@@ -1379,7 +1408,24 @@ document.addEventListener("DOMContentLoaded", () => {
           <circle cx="-12" cy="13" r="2.2" fill="#f2ad98" opacity=".82"/>
         </g>
       `,
-      "doble-corazon": symbolPath("M-29-6C-29-16-17-20-10-10C-3-20 9-16 9-6C9 5-3 13-10 20C-17 13-29 5-29-6ZM-4-6C-4-16 8-20 15-10C22-20 34-16 34-6C34 5 22 13 15 20C10 15 4 11 0 5"),
+      "doble-corazon": `
+        <g transform="translate(0 1)">
+          <path d="M-34-8C-34-22-18-28-8-14C2-28 18-22 18-8C18 7 2 18-8 27C-18 18-34 7-34-8Z"
+                fill="#ffd3c3" opacity=".16"/>
+          <path d="M-13-11C-13-25 3-31 13-17C23-31 39-25 39-11C39 4 23 15 13 24C6 18-4 11-10 2"
+                fill="#ffd3c3" opacity=".12"/>
+          <path d="M-34-8C-34-22-18-28-8-14C2-28 18-22 18-8C18 7 2 18-8 27C-18 18-34 7-34-8Z
+                   M-13-11C-13-25 3-31 13-17C23-31 39-25 39-11C39 4 23 15 13 24C6 18-4 11-10 2"
+                fill="none" stroke="#5f201b" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" opacity=".34"/>
+          <path d="M-34-8C-34-22-18-28-8-14C2-28 18-22 18-8C18 7 2 18-8 27C-18 18-34 7-34-8Z
+                   M-13-11C-13-25 3-31 13-17C23-31 39-25 39-11C39 4 23 15 13 24C6 18-4 11-10 2"
+                fill="none" stroke="#f4b29f" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round" opacity=".82"/>
+          <path d="M-24-15C-20-19-15-20-11-17M3-18C7-22 13-23 17-19"
+                fill="none" stroke="#ffd9ca" stroke-width="3" stroke-linecap="round" opacity=".44"/>
+          <path d="M-28 25C-14 35 9 35 25 25"
+                fill="none" stroke="#f4b29f" stroke-width="3.2" stroke-linecap="round" opacity=".44"/>
+        </g>
+      `,
       flor: symbolPath("M0-24C13-24 15-9 6-2C18-10 29-2 23 10C17 20 4 13 1 5C4 18-6 28-16 22C-26 16-17 3-8 0C-21 3-28-9-20-18C-13-27-3-16 0-7C-2-18 0-24 0-24Z"),
       sol: `${circleSymbol()}${symbolPath("M0-32v9M0 23v9M-32 0h9M23 0h9M-22-22l7 7M15 15l7 7M22-22l-7 7M-15 15l-7 7")}`,
       "nota-musical": symbolPath("M-16-25V12C-16 21-32 24-35 15C-38 6-23 0-16 8M16-31V6C16 15 0 18-3 9C-6 0 9-5 16 2M-16-25C-4-19 5-23 16-31M-16-16C-4-10 5-14 16-22"),
