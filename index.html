@@ -187,6 +187,7 @@
       <p>Pero todavía queda una sorpresa más.</p>
 
       <button id="closeFinalButton" class="primary-button" type="button">
+        <i class="ph ph-sparkle" aria-hidden="true"></i>
         Continuar
       </button>
     </div>
@@ -199,13 +200,15 @@
     <div class="video-modal__backdrop" data-close-video></div>
 
     <article class="video-card">
+      <div class="video-card__halo" aria-hidden="true"></div>
+
       <button class="icon-button icon-button--dark video-card__close" type="button" data-close-video aria-label="Cerrar video sorpresa">
         <i class="ph ph-x" aria-hidden="true"></i>
       </button>
 
       <p class="eyebrow">Sorpresa final</p>
       <h2 id="videoTitle">Una última sorpresa para vos</h2>
-      <p>Dale play cuando estés lista.</p>
+      <p>Dale play cuando estés lista. El sonido empieza solo cuando vos lo elijas.</p>
 
       <div class="video-frame">
         <video id="surpriseVideo" controls preload="metadata" playsinline webkit-playsinline></video>
