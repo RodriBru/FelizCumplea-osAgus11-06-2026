@@ -8,7 +8,7 @@
      nota-musical, playa, copa-vino o gimnasio.
 */
 
-const VIDEO_SORPRESA = "./video/video-sorpresa.mp4";
+const VIDEO_SORPRESA = "./videoCumpleAgus.mp4";
 
 const CARTAS = [
   {
@@ -77,8 +77,8 @@ const CARTAS = [
   {
     id: 10,
     nombre: "Perla",
-    archivo: "./assets/img/cartas/carta-perla.jpg",
-    disponible: false,
+    archivo: "./carta_De_perla.jpeg",
+    disponible: true,
     sello: "cookie"
   }
 ];
