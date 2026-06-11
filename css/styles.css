@@ -479,6 +479,30 @@ img {
   filter: none;
 }
 
+.envelope-swiper.is-fallback {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-inline: max(16px, calc((100vw - 452px) / 2));
+  scrollbar-width: thin;
+}
+
+.envelope-swiper.is-fallback .swiper-wrapper {
+  display: flex;
+  gap: 16px;
+  width: max-content;
+}
+
+.envelope-swiper.is-fallback .swiper-slide {
+  opacity: 1;
+  scale: 1;
+  filter: none;
+}
+
+.envelope-swiper.is-fallback .envelope-card__name {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .envelope-card {
   position: relative;
   display: grid;
@@ -1061,9 +1085,25 @@ img {
   color: #fffaf1;
   text-align: center;
   background:
-    radial-gradient(circle at 50% 17%, rgba(255, 219, 165, .18), transparent 32%),
+    radial-gradient(circle at 50% 17%, rgba(255, 219, 165, .22), transparent 32%),
+    radial-gradient(circle at 22% 84%, rgba(185, 91, 82, .18), transparent 27%),
     linear-gradient(180deg, rgba(27, 21, 22, .86), rgba(18, 14, 16, .9));
   backdrop-filter: blur(18px);
+}
+
+.video-modal.is-final-transition::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 18% 24%, rgba(255, 231, 194, .54) 0 2px, transparent 3px),
+    radial-gradient(circle at 73% 20%, rgba(255, 197, 180, .42) 0 2px, transparent 3px),
+    radial-gradient(circle at 86% 72%, rgba(255, 226, 178, .46) 0 2px, transparent 3px),
+    radial-gradient(circle at 34% 82%, rgba(255, 211, 198, .4) 0 2px, transparent 3px);
+  background-size: 240px 240px;
+  opacity: .52;
+  animation: finalDrift 10s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
 .video-card {
@@ -1082,6 +1122,19 @@ img {
     radial-gradient(circle at 50% 0, rgba(255, 226, 183, .2), transparent 42%),
     linear-gradient(145deg, rgba(64, 42, 42, .98), rgba(38, 29, 31, .98));
   box-shadow: 0 32px 86px rgba(8, 6, 7, .44);
+}
+
+.video-card__halo {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 224, 178, .34), transparent 42%),
+    linear-gradient(135deg, rgba(255, 223, 181, .2), rgba(188, 90, 88, .12));
+  filter: blur(18px);
+  opacity: .72;
+  pointer-events: none;
 }
 
 .video-card__close {
@@ -1161,6 +1214,13 @@ img {
     0 10px 24px rgba(0, 0, 0, .16);
   backdrop-filter: blur(12px);
   transition: transform .22s var(--ease), background .22s var(--ease), border-color .22s var(--ease);
+}
+
+.video-control-button:first-child {
+  border-color: rgba(255, 218, 184, .32);
+  background:
+    linear-gradient(135deg, rgba(151, 62, 55, .92), rgba(187, 96, 78, .88)),
+    radial-gradient(circle at 30% 10%, rgba(255, 231, 191, .26), transparent 34%);
 }
 
 .video-control-button:hover,
@@ -1281,11 +1341,11 @@ img {
   }
 
   .video-frame video {
-    max-height: calc(100dvh - 138px);
+    max-height: calc(100dvh - 146px);
   }
 
   .video-pending-state {
-    min-height: calc(100dvh - 138px);
+    min-height: calc(100dvh - 146px);
   }
 }
 
@@ -1407,6 +1467,7 @@ img {
 
   .video-card {
     width: min(96vw, 520px);
+    max-height: 96dvh;
     border-radius: 24px;
     padding: 22px 12px 14px;
   }
@@ -1426,7 +1487,7 @@ img {
   }
 
   .video-frame video {
-    max-height: 58dvh;
+    max-height: min(50dvh, 460px);
   }
 
   .video-controls {
